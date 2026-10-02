@@ -62,6 +62,6 @@ npm run dev
 - OKTA_ISSUER = okta-issuer from OKTA
 - OKTA_REDIRECT_URL = http://localhost:5000/authorize/callback
 - DRIFT_API_KEY = insert your api key
-FRONTEND_URL=http://localhost:5173
+- FRONTEND_URL=http://localhost:5173
 # Enivronment Variables - frontend
 - VITE_BACKEND_URL = http://localhost:5000
