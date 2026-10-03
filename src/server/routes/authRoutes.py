@@ -57,6 +57,7 @@ def register():
         password = data.get("password")
         name = data.get("name")
         username = data.get("username")
+        phone_number = data.get("phone_number")
 
         if not email or not password:
             return jsonify({
@@ -77,6 +78,7 @@ def register():
             name = name,
             username = username,
             password_hash=bcrypt.hash(password),
+            phone_number=phone_number,
             role="patient",
             created_at=datetime.now(timezone.utc),
             last_login=datetime.now(timezone.utc)

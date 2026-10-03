@@ -17,15 +17,20 @@ The Campus Health Appointment System is a web application that allows university
 - Okta OIDC
 
 ### Frontend
-- HTML
+- HTML / CSS
 - React
 - Vite
 - JavaScript
+- Twilio
 
 ### Dev tools
 - Git
 - GitHub
 - Postman
+
+## External Services
+- Okta authentication
+- Twilio for SMS*appointment notifications
 
 # Repository Setup
 
@@ -36,6 +41,30 @@ Clone the repository steps
 Authentication
 
 The application uses Okta for authentication. The frontend provides a Login with Okta button that redirects the user to Okta for authentication. After authentication, Okta redirects the user back to the application's callback endpoint.
+
+### Appointment S*heduling
+- View available appointm*nt slots
+- Provider selection
+- Appointment availability up to 3 mont*s in advance
+- Monday-Friday appoi*tment availability
+- Book appointmints
+- View appointment details
+- C*ncel appointments
+- Reschedule app*intments
+- Prevent booking an alre*dy scheduled provider/time
+
+### Patient Profile
+- View profile inform*tion
+- Add or update phone number
+- Phone number stored for SMS notif*cations
+
+### SMS Notifications
+- Twilio integration
+- SMS triggered after successful appointment booking.
+The current Twilio trial environment uses a predefined appointment
+reminder template. The sample date/time contained in the Twilio trial
+message is controlled by the trial template rather than the
+appointment data stored by the application.
 
 # Running the Application
 
@@ -62,6 +91,10 @@ npm run dev
 - OKTA_ISSUER = okta-issuer from OKTA
 - OKTA_REDIRECT_URL = http://localhost:5000/authorize/callback
 - DRIFT_API_KEY = insert your api key
-- FRONTEND_URL=http://localhost:5173
+- FRONTEND_URL = http://localhost:5173
+- TWILIO_ACCOUNT_SID = twilio_account_sid
+- TWILIO_AUTH_TOKEN = auth_token
+- TWILIO_PHONE_NUMBER = phone_number
+
 # Enivronment Variables - frontend
 - VITE_BACKEND_URL = http://localhost:5000

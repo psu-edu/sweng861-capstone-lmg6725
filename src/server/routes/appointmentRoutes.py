@@ -1,7 +1,8 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import Blueprint, jsonify, redirect, request, session
 from middleware.authMiddleware import require_auth
 from middleware.roleMiddleware import require_role
+from services.twilio_service import send_appointment_confirmation
 from models.appointment import Appointment
 from config import OKTA_REDIRECT_URL
 from models.database import SessionLocal
@@ -15,16 +16,109 @@ from passlib.hash import bcrypt
 appointment_bp = Blueprint("appointment", __name__)
 
 # Get available appointment slots (for patients)
-@appointment_bp.route("/appointments/slots", methods=["GET"])
+@appointment_bp.route(
+    "/appointments/slots",
+    methods=["GET"]
+)
 @require_auth
+@require_role("patient")
 def get_available_slots():
-    # testing
-    slots = [
-        {"date": "2024-07-01", "time": "09:00 AM"},
-        {"date": "2024-07-01", "time": "10:00 AM"},
-        {"date": "2024-07-01", "time": "11:00 AM"}
-    ]
-    return jsonify({"slots": slots})
+    db = SessionLocal()
+
+    try:
+        now = datetime.now()
+        end_date = now + timedelta(days=90)
+
+        available_times = [
+            (9, 0),
+            (10, 0),
+            (11, 0),
+            (13, 0),
+            (14, 0),
+            (15, 0)
+        ]
+
+        # Get all doctor users
+        providers = [
+            "Dr. Alex",
+            "Dr. Lauren",
+            "Dr. Harrison",
+            "Nurse Sharon",
+            "Nurse Brandon",
+            "Nurse Braxton",
+            "Campus Health Center"
+        ]
+
+        # Get scheduled appointments once
+        scheduled_appointments = (
+            db.query(Appointment)
+            .filter(
+                Appointment.appointment_date >= now,
+                Appointment.appointment_date <= end_date,
+                Appointment.status == "scheduled"
+            )
+            .all()
+        )
+
+        # Fast lookup of unavailable slots
+        booked_slots = {
+            (
+                appointment.provider_name,
+                appointment.appointment_date
+            )
+            for appointment in scheduled_appointments
+        }
+
+        slots = []
+
+        for day_offset in range(1, 91):
+
+            day = now + timedelta(
+                days=day_offset
+            )
+
+            # Skip Saturday and Sunday
+            if day.weekday() >= 5:
+                continue
+
+            # Filter slots by provider
+            for provider in providers:
+
+                for hour, minute in available_times:
+
+                    slot_datetime = day.replace(
+                        hour=hour,
+                        minute=minute,
+                        second=0,
+                        microsecond=0
+                    )
+
+                    slot_key = (
+                        provider,
+                        slot_datetime
+                    )
+
+                    if slot_key not in booked_slots:
+
+                        slots.append({
+                            "provider_name": provider,
+
+                            "appointment_date":
+                                slot_datetime.isoformat()
+                        })
+
+        return jsonify({
+            "slots": slots
+        }), 200
+
+    except Exception as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+    finally:
+        db.close()
 
 # Book an appointment (for patients)
 @appointment_bp.route("/appointments/book", methods=["POST"])
@@ -33,33 +127,96 @@ def get_available_slots():
 def book_appointment():
     data = request.get_json()
     db = SessionLocal()
-    appointment_date = datetime.fromisoformat(data.get("appointment_date"))
-    # Logic to book an appointment
-    appointment = Appointment(
-        patient_id = g.user_id,
-        #doctor_id=data.get("doctor_id"),
-        appointment_date=appointment_date,
-        provider_name=data.get("provider_name"),
-        reason=data.get("reason"), 
-        patient_notes=data.get("patient_notes"),
-        status="scheduled",
 
-        # Notify PCP
-        pcp_notification_requested=data.get("pcp_notification_requested", False),
-        pcp_name=data.get("pcp_name"),
-        pcp_email=data.get("pcp_email")
+    try:
+        appointment_date = datetime.fromisoformat(data.get("appointment_date"))
+        # Logic to book an appointment
+        appointment = Appointment(
+            patient_id = g.user_id,
+            #doctor_id=data.get("doctor_id"),
+            appointment_date=appointment_date,
+            provider_name=data.get("provider_name"),
+            reason=data.get("reason"), 
+            patient_notes=data.get("patient_notes"),
+            status="scheduled",
 
-    )
-    # Check date
-    if appointment_date < datetime.now():
-        return jsonify({
-            "error": "Appointments cannot be booked in the past"
+            # Notify PCP
+            pcp_notification_requested=data.get("pcp_notification_requested", False),
+            pcp_name=data.get("pcp_name"),
+            pcp_email=data.get("pcp_email")
+
+        )
+        # Check date
+        if appointment_date < datetime.now():
+            return jsonify({
+                "error": "Appointments cannot be booked in the past"
+                }), 400
+        
+        max_appointment_date = datetime.now() + timedelta(days=90)
+
+        if appointment_date > max_appointment_date:
+            return jsonify({
+                "error": (
+                    "Appointments cannot be booked "
+                    "more than 3 months in advance."
+                )
             }), 400
 
-    db.add(appointment)
-    db.commit()
-    db.close()
-    return jsonify({"message": "Appointment booked successfully"}), 201
+        # Check if the appointment slot is already taken
+        existing_appointment = (
+            db.query(Appointment)
+            .filter(
+                Appointment.provider_name
+                    == data.get("provider_name"),
+                Appointment.appointment_date
+                    == appointment_date,
+                Appointment.status == "scheduled"
+            )
+            .first()
+        )
+
+        if existing_appointment:
+            return jsonify({
+                "error": (
+                    "That appointment slot is no longer "
+                    "available. Please select another."
+                )
+            }), 409
+
+        db.add(appointment)
+        db.commit()
+        db.refresh(appointment)
+
+        current_user = (db.query(User).filter(User.provider_id == g.user_id).first())
+
+        # default sms sent variable
+        sms_sent = False
+
+        if current_user and current_user.phone_number:
+            try:
+                send_appointment_confirmation(
+                    patient_phone =current_user.phone_number,
+                    provider_name = appointment.provider_name,
+                    appointment_date = appointment.appointment_date
+                )
+
+                sms_sent = True
+
+            except Exception as sms_error:
+                print(f"Error sending SMS: {sms_error}")
+
+
+        return jsonify({
+            "message": "Appointment booked successfully",
+            "appointment_id": appointment.id,
+            "sms_confirmation_sent": sms_sent
+        }), 201
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500      
+
+    finally:
+        db.close()
 
 # Cancel an appointment (for patients)
 @appointment_bp.route("/appointments/<int:id>/cancel",methods=["PUT"])

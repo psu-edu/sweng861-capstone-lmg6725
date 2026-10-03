@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { apiRequest } from "../services/api";
+import { useLocation } from "react-router-dom";
 
 function BookAppointmentPage() {
+  const location = useLocation();
+  const selectedSlot = location.state || {};
+  
   const [formData, setFormData] = useState({
-    appointment_date: "",
-    provider_name: "",
+    appointment_date: selectedSlot.appointment_date || "",
+    provider_name: selectedSlot.provider_name || "",
     reason: "",
     patient_notes: "",
     pcp_notification_requested: false,

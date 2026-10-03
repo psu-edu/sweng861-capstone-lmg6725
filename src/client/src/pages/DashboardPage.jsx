@@ -60,6 +60,18 @@ function DashboardPage() {
             View My Appointments
           </button>
         </Link>
+        
+        <Link to="/profile">
+          <button>
+            My Profile
+          </button>
+        </Link>
+
+        <Link to="/appointments/slots">
+          <button>
+            View Available Slots
+          </button>
+        </Link>
 
         <Link to="/appointments/book">
           <button>

@@ -74,7 +74,7 @@ app.register_blueprint(health_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(prompt_bp)
 app.register_blueprint(appointment_bp)
-Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine) # create tables if they don't exist
 
 # Register the Okta OAuth client with the necessary configuration
 oauth.register( 

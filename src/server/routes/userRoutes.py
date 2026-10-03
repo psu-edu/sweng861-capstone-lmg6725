@@ -49,11 +49,57 @@ def get_users():
     result = {
             "email": user.email, 
             "name": user.name,
+            "phone_number": user.phone_number,
             "created_at": user.created_at,
             "last_login": user.last_login}
     
     db.close()
     return jsonify(result)
+
+# Update user information for the authenticated user
+@user_bp.route("/users/me", methods=["PUT"])
+@require_auth
+def update_user():
+    data = request.get_json()
+
+    db = SessionLocal()
+
+    try:
+        user = (
+            db.query(User)
+            .filter(User.provider_id == g.user_id)
+            .first()
+        )
+
+        if not user:
+            return jsonify({
+                "error": "User not found"
+            }), 404
+
+        phone_number = data.get("phone_number")
+
+        if not phone_number:
+            return jsonify({
+                "error": "Phone number is required"
+            }), 400
+
+        user.phone_number = phone_number
+        
+        db.commit()
+
+        return jsonify({
+            "message": "Profile updated successfully"
+        }), 200
+
+    except Exception as e:
+        db.rollback()
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+    finally:
+        db.close()
 
 # Check if a user is an admin
 @user_bp.route("/users", methods=["GET"])
@@ -101,3 +147,48 @@ def protected():
         "message": f"Hello, {g.name or 'user'}!",
         "name": g.name
     })
+
+# Add phone number to user profile
+@user_bp.route("/users/me/phone", methods=["PUT"])
+@require_auth
+def update_phone_number():
+    data = request.get_json()
+
+    phone_number = data.get("phone_number")
+
+    if not phone_number:
+        return jsonify({
+            "error": "Phone number is required"
+        }), 400
+
+    db = SessionLocal()
+
+    try:
+        user = (
+            db.query(User)
+            .filter(User.provider_id == g.user_id)
+            .first()
+        )
+
+        if not user:
+            return jsonify({
+                "error": "User not found"
+            }), 404
+
+        user.phone_number = phone_number
+
+        db.commit()
+
+        return jsonify({
+            "message": "Phone number updated"
+        }), 200
+
+    except Exception as e:
+        db.rollback()
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+    finally:
+        db.close()

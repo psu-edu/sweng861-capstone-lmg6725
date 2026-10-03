@@ -14,6 +14,7 @@ class User(Base):
     username = Column(String(50), unique = True, nullable = True) # OAuth does not provide username
     password_hash = Column(String(255), nullable = True) # OAuth does not provide password hash
     role = Column(String(20), default="patient")
+    phone_number = Column(String, nullable=True)
 
     # Timestamp indicating when the user was created
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
