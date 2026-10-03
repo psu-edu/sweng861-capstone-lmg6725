@@ -30,7 +30,7 @@ The Campus Health Appointment System is a web application that allows university
 
 ## External Services
 - Okta authentication
-- Twilio for SMS*appointment notifications
+- Twilio for SMS appointment notifications
 
 # Repository Setup
 
@@ -42,21 +42,21 @@ Authentication
 
 The application uses Okta for authentication. The frontend provides a Login with Okta button that redirects the user to Okta for authentication. After authentication, Okta redirects the user back to the application's callback endpoint.
 
-### Appointment S*heduling
-- View available appointm*nt slots
+### Appointment Scheduling
+- View available appointmint slots
 - Provider selection
-- Appointment availability up to 3 mont*s in advance
-- Monday-Friday appoi*tment availability
+- Appointment availability up to 3 montsh in advance
+- Monday-Friday appointment availability
 - Book appointmints
 - View appointment details
-- C*ncel appointments
-- Reschedule app*intments
-- Prevent booking an alre*dy scheduled provider/time
+- Cancel appointments
+- Reschedule appointments
+- Prevent booking an already scheduled provider/time
 
 ### Patient Profile
-- View profile inform*tion
+- View profile information
 - Add or update phone number
-- Phone number stored for SMS notif*cations
+- Phone number stored for SMS notifications
 
 ### SMS Notifications
 - Twilio integration
