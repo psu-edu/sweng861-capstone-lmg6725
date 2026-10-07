@@ -137,10 +137,9 @@ The application displays an authorization notice explaining that selecting the r
 
 ## Repository Setup
 
-Clone the repository:
+Clone the repository: git clone https://github.com/psu-edu/sweng861-capstone-lmg6725.git
 
-git clone https://github.com/psu-edu/sweng861-capstone-lmg6725.git
-cd sweng861-capstone-lmg6725
+- cd sweng861-capstone-lmg6725
 
 
 ## Running the Backend
@@ -181,7 +180,7 @@ DRIFT_API_KEY=<Drift API key>
 TWILIO_ACCOUNT_SID=<Twilio account SID>
 TWILIO_AUTH_TOKEN=<Twilio auth token>
 TWILIO_PHONE_NUMBER=<Twilio sending phone number>
-```
+
 
 ### Frontend
 - VITE_BACKEND_URL = http://localhost:5000
