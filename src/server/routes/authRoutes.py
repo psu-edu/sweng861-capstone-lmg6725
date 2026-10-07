@@ -174,9 +174,49 @@ def authorize():
         return redirect(f"{FRONTEND_URL}/login?error=true")
 
 # Return session information
-@auth_bp.route("/session-info")
+"""@auth_bp.route("/session-info")
 def session_info():
     return jsonify({
         "logged_in": "access_token" in session,
         "access_token": session.get("access_token")
-    })
+    })"""
+
+@auth_bp.route("/session-info")
+def session_info():
+
+    if "access_token" not in session:
+        return jsonify({
+            "logged_in": False,
+            "role": None
+        }), 200
+
+    provider_id = session.get("user_id")
+
+    db = SessionLocal()
+
+    try:
+        user = (
+            db.query(User)
+            .filter(
+                User.provider_id == provider_id
+            )
+            .first()
+        )
+
+        if not user:
+            return jsonify({
+                "logged_in": True,
+                "role": None,
+                "email": None
+            }), 200
+
+        return jsonify({
+            "logged_in": True,
+            "access_token":
+                session.get("access_token"),
+            "role": user.role,
+            "email": user.email
+        }), 200
+
+    finally:
+        db.close()

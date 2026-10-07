@@ -1,12 +1,4 @@
-from flask import (
-    Flask,
-    jsonify,
-    session,
-    send_from_directory,
-    request,
-    g,
-    redirect
-)
+from flask import (Flask, jsonify, session, send_from_directory, request, g, redirect)
 from functools import wraps
 from datetime import datetime, timezone
 from flask_limiter import Limiter
@@ -16,6 +8,7 @@ import logging
 from authlib.integrations.flask_client import OAuth
 import models
 from models.database import engine, SessionLocal
+from models.provider import Provider # import doctors and nurses
 from config import (
     SECRET_KEY,
     OKTA_CLIENT_ID,
@@ -46,6 +39,7 @@ from routes.healthRoutes import health_bp
 from routes.apiRoutes import api_bp
 from routes.aiPromptsRoutes import prompt_bp
 from routes.appointmentRoutes import appointment_bp
+from routes.providerDecisionRoute import provider_bp
 
 # Initialize Flask application
 app = Flask(__name__)
@@ -74,6 +68,7 @@ app.register_blueprint(health_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(prompt_bp)
 app.register_blueprint(appointment_bp)
+app.register_blueprint(provider_bp)
 Base.metadata.create_all(bind=engine) # create tables if they don't exist
 
 # Register the Okta OAuth client with the necessary configuration

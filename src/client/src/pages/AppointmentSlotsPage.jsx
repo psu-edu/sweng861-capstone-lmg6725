@@ -10,15 +10,7 @@ function AppointmentSlotsPage() {
   const [error, setError] = useState("");
 
   // Keep this provider list the same as BookAppointmentPage.jsx
-  const providers = [
-    "Dr. Alex",
-    "Dr. Lauren",
-    "Dr. Harrison",
-    "Nurse Sharon",
-    "Nurse Brandon",
-    "Nurse Braxton",
-    "Campus Health Center"
-  ];
+  const [providers, setProviders] = useState([]);
 
   useEffect(() => {
     apiRequest("/appointments/slots")
@@ -32,6 +24,16 @@ function AppointmentSlotsPage() {
         setLoading(false);
       });
   }, []);
+
+  useEffect(() => {
+  apiRequest("/providers")
+    .then((data) => {
+      setProviders(data.providers || []);
+    })
+    .catch((err) => {
+      setError(err.message);
+    });
+}, []);
 
   // Get slots for the selected provider
   const providerSlots = slots.filter(
@@ -160,10 +162,10 @@ return (
 
           {providers.map((provider) => (
             <option
-              key={provider}
-              value={provider}
+              key={provider.id}
+              value={provider.name}
             >
-              {provider}
+              {provider.name}
             </option>
           ))}
         </select>

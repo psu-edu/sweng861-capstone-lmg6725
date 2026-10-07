@@ -1,20 +1,22 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
 import { apiRequest } from "../services/api";
+import { useLocation } from "react-router-dom";
+import { useEffect} from "react";
 
 function BookAppointmentPage() {
   const location = useLocation();
-
-  // Booking is only allowed after the patient selects a real appointment
-  // from either Available Appointment Slots or Recommended Appointments.
-  // Both pages pass provider_name and appointment_date through router state.
+  // If coming from appointment slots page it will be passed in here
   const selectedSlot = location.state || {};
-  const hasSelectedSlot = Boolean(
-    selectedSlot.provider_name && selectedSlot.appointment_date
-  );
+  const hasSelectedSlot = Boolean(selectedSlot.provider_name && selectedSlot.appointment_date);
 
-  // Booking form data. Provider and appointment date come from the
-  // selected slot and are displayed as read-only fields below.
+  const cameFromSlotsPage = Boolean(selectedSlot.provider_name && selectedSlot.appointment_date);
+
+  // Providers from database
+  const [providers, setProviders] = useState([]);
+  const [providersLoading, setProvidersLoading] = useState(true);
+  const [providersError, setProvidersError] = useState("");
+
+  // Booking form data
   const [formData, setFormData] = useState({
     appointment_date: selectedSlot.appointment_date || "",
     provider_name: selectedSlot.provider_name || "",
@@ -28,32 +30,39 @@ function BookAppointmentPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+  
+  // Fetch providers from the database
+  useEffect(() => {
+    apiRequest("/providers")
+      .then((data) => {setProviders(data.providers || []);})
+      .catch((err) => {setProvidersError(err.message);})
+      .finally(() => {setProvidersLoading(false);});
+  }, []);
 
-  // Synchronize form state for editable fields such as reason, notes,
-  // and the optional PCP notification request.
+  // synchronize component state
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-
     setFormData({
-      ...formData,
-      [name]: type === "checkbox" ? checked : value
-    });
-  };
+        ...formData,
+        [name]: type === "checkbox" ? checked : value
+        });
+    };
 
-  // Validate and submit the selected appointment to the booking endpoint.
+
+  // Validate and submit the appointment form to the booking endpoint
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setError("");
     setSuccess("");
 
-    // Provider and appointment date should always be present because the
-    // patient must select a slot before reaching this page.
+    // Required fields before request can be sent
     if (
       !formData.provider_name ||
       !formData.appointment_date ||
       !formData.reason
     ) {
-      setError("Provider, appointment date, and reason are required.");
+      setError("Doctor, appointment date, and reason are required.");
       return;
     }
 
@@ -67,11 +76,10 @@ function BookAppointmentPage() {
 
       setSuccess("Appointment booked successfully.");
 
-      // Keep the selected provider/date visible after booking, but clear
-      // the patient-entered details so sensitive notes do not remain filled in.
+      // Clear form after appointment is created successfully
       setFormData({
-        appointment_date: selectedSlot.appointment_date || "",
-        provider_name: selectedSlot.provider_name || "",
+        appointment_date: "",
+        provider_name: "",
         reason: "",
         patient_notes: "",
         pcp_notification_requested: false,
@@ -84,35 +92,6 @@ function BookAppointmentPage() {
       setLoading(false);
     }
   };
-
-  // If the patient opens /appointments/book directly instead of selecting
-  // a valid slot first, send the patient back to one of the scheduling paths.
-  if (!hasSelectedSlot) {
-    return (
-      <div>
-        <h1>Book Appointment</h1>
-
-        <p>
-          Please select an available appointment before continuing.
-        </p>
-
-        <Link to="/appointments/slots">
-          <button type="button">
-            View Available Appointments
-          </button>
-        </Link>
-
-        <br />
-        <br />
-
-        <Link to="/appointments/recommend">
-          <button type="button">
-            Find Recommended Appointment
-          </button>
-        </Link>
-      </div>
-    );
-  }
 
   return (
     <div>
@@ -131,51 +110,73 @@ function BookAppointmentPage() {
       )}
 
       <form onSubmit={handleSubmit}>
-        {/* Provider was chosen on the slots or recommendation page. */}
         <div>
           <label htmlFor="provider_name">
             <strong>Provider</strong>
           </label>
+
           <br />
-          <input
+
+          <select
             id="provider_name"
-            type="text"
             name="provider_name"
             value={formData.provider_name}
-            readOnly
-          />
+            onChange={handleChange}
+            disabled={providersLoading || cameFromSlotsPage}
+            required
+          >
+            <option value="">
+              {providersLoading
+                ? "Loading providers..."
+                : "Select Provider"}
+            </option>
+
+            {providers.map((provider) => (
+              <option
+                key={provider.id}
+                value={provider.name}
+              >
+                {provider.name}
+                {provider.specialty
+                  ? ` - ${provider.specialty}`
+                  : ""}
+              </option>
+            ))}
+          </select>
+
+          {providersError && (
+            <p style={{ color: "red" }}>
+              Unable to load providers: {providersError}
+            </p>
+          )}
         </div>
 
         <br />
 
-        {/* Appointment date/time was chosen before reaching this page. */}
         <div>
-          <label htmlFor="appointment_date">
-            <strong>Appointment Date</strong>
-          </label>
+          <label>Appointment Date</label>
           <br />
+          {/* Prevent users from selecting a date in the past. */}
           <input
-            id="appointment_date"
-            type="datetime-local"
-            name="appointment_date"
+            type = "datetime-local"
+            name = "appointment_date"
             value={
               formData.appointment_date
-                ? formData.appointment_date.slice(0, 16)
-                : ""
-            }
-            readOnly
+              ? formData.appointment_date.slice(0, 16)
+              : ""
+              }
+            onChange = {handleChange}
+            readOnly={cameFromSlotsPage}
+            min = {new Date().toISOString().slice(0,16)}
           />
         </div>
 
         <br />
 
         <div>
-          <label htmlFor="reason">
-            <strong>Reason</strong>
-          </label>
+          <label>Reason</label>
           <br />
           <input
-            id="reason"
             type="text"
             name="reason"
             value={formData.reason}
@@ -186,12 +187,9 @@ function BookAppointmentPage() {
         <br />
 
         <div>
-          <label htmlFor="patient_notes">
-            <strong>Patient Notes</strong>
-          </label>
+          <label>Patient Notes</label>
           <br />
           <textarea
-            id="patient_notes"
             name="patient_notes"
             value={formData.patient_notes}
             onChange={handleChange}
@@ -212,7 +210,6 @@ function BookAppointmentPage() {
           }}
         >
           <h3>Primary Care Provider Notification</h3>
-
           {/* Authorization information */}
           <div
             style={{
@@ -226,53 +223,69 @@ function BookAppointmentPage() {
             <strong>Important Authorization Information</strong>
 
             <p>
-              Checking this option does not automatically send your
-              appointment information to your Primary Care Provider.
+              Checking this option does not automatically send
+              your appointment information to your Primary Care
+              Provider.
             </p>
 
             <p>
-              A physical authorization signature must be completed in the
-              Campus Health office before information can be sent to your PCP.
+              A physical authorization signature must be completed
+              in the Campus Health office before information can be
+              sent to your PCP.
             </p>
 
             <p>
-              If you have already completed an authorization form for your
-              current PCP, you do not need to sign another form.
+              If you have already completed an authorization form
+              for your current PCP, you do not need to sign another
+              form.
             </p>
 
             <p>
-              To change your PCP, select this option and enter the new PCP
-              information below. A new authorization may be required before
-              information is sent.
+              To change your PCP, select this option and enter the
+              new PCP information below. A new authorization may be
+              required before information is sent.
             </p>
 
             <p style={{ marginBottom: "0" }}>
-              To stop sending information to your PCP, please call the Campus
-              Health office or visit the office in person.
+              To stop sending information to your PCP, please call
+              the Campus Health office or visit the office in person.
             </p>
           </div>
-
+          
           {/* PCP request checkbox */}
           <label>
             <input
               type="checkbox"
               name="pcp_notification_requested"
-              checked={formData.pcp_notification_requested}
+              checked={
+                formData.pcp_notification_requested
+              }
               onChange={handleChange}
             />
+
             {" "}
             Request notification to my Primary Care Provider
           </label>
-
+          
           {/* Show PCP information only when requested */}
           {formData.pcp_notification_requested && (
-            <div style={{ marginTop: "15px" }}>
+            <div
+              style={{
+                marginTop: "15px"
+              }}
+            >
               {/* PCP Name */}
-              <div style={{ marginBottom: "15px" }}>
+              <div
+                style={{
+                  marginBottom: "15px"
+                }}
+              >
                 <label htmlFor="pcp_name">
                   <strong>Primary Care Provider Name</strong>
                 </label>
+
                 <br />
+
                 <input
                   id="pcp_name"
                   type="text"
@@ -287,13 +300,14 @@ function BookAppointmentPage() {
                   }}
                 />
               </div>
-
               {/* PCP Email */}
               <div>
                 <label htmlFor="pcp_email">
                   <strong>Primary Care Provider Email</strong>
                 </label>
+
                 <br />
+
                 <input
                   id="pcp_email"
                   type="email"
@@ -312,7 +326,6 @@ function BookAppointmentPage() {
           )}
         </div>
 
-        {/* Preserve the existing loading status on the submit button. */}
         <button
           aria-label="Book Appointment"
           type="submit"

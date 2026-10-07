@@ -3,9 +3,10 @@ from flask import Blueprint, jsonify, redirect, request, session
 from middleware.authMiddleware import require_auth
 from middleware.roleMiddleware import require_role
 from services.twilio_service import send_appointment_confirmation
-from models.appointment import Appointment
 from config import OKTA_REDIRECT_URL
 from models.database import SessionLocal
+from models.provider import Provider
+from models.appointment import Appointment
 from User import User
 from flask import g
 from extensions import limiter, oauth
@@ -29,6 +30,14 @@ def get_available_slots():
         now = datetime.now()
         end_date = now + timedelta(days=90)
 
+        # Get all providers from table
+        providers = (
+            db.query(Provider)
+            .filter(Provider.active.is_(True))
+            .order_by(Provider.name.asc())
+            .all()
+        )
+
         available_times = [
             (9, 0),
             (10, 0),
@@ -36,17 +45,6 @@ def get_available_slots():
             (13, 0),
             (14, 0),
             (15, 0)
-        ]
-
-        # Get all doctor users
-        providers = [
-            "Dr. Alex",
-            "Dr. Lauren",
-            "Dr. Harrison",
-            "Nurse Sharon",
-            "Nurse Brandon",
-            "Nurse Braxton",
-            "Campus Health Center"
         ]
 
         # Get scheduled appointments once
@@ -94,17 +92,17 @@ def get_available_slots():
                     )
 
                     slot_key = (
-                        provider,
+                        provider.name,
                         slot_datetime
                     )
 
                     if slot_key not in booked_slots:
-
                         slots.append({
-                            "provider_name": provider,
-
-                            "appointment_date":
-                                slot_datetime.isoformat()
+                            "provider_id": provider.id,
+                            "provider_name": provider.name,
+                            "specialty": provider.specialty,
+                            "service_category": provider.service_category,
+                            "appointment_date": slot_datetime.isoformat()
                         })
 
         return jsonify({
@@ -119,6 +117,201 @@ def get_available_slots():
 
     finally:
         db.close()
+
+# Recommend appointment slots based on
+# service category and scheduling preference
+@appointment_bp.route(
+    "/appointments/recommend",
+    methods=["POST"]
+)
+@require_auth
+@require_role("patient")
+def recommend_appointments():
+    data = request.get_json() or {}
+
+    service_category = data.get("service_category")
+    time_preference = data.get(
+        "time_preference",
+        "any"
+    )
+
+    if not service_category:
+        return jsonify({
+            "error": "Service category is required"
+        }), 400
+
+    db = SessionLocal()
+
+    try:
+        now = datetime.now()
+        end_date = now + timedelta(days=90)
+
+        available_times = [
+            (9, 0),
+            (10, 0),
+            (11, 0),
+            (13, 0),
+            (14, 0),
+            (15, 0)
+        ]
+
+        # Find active providers that match
+        # the requested service
+        providers = (
+            db.query(Provider)
+            .filter(
+                Provider.active.is_(True),
+                Provider.service_category
+                    == service_category
+            )
+            .order_by(
+                Provider.name.asc()
+            )
+            .all()
+        )
+
+        if not providers:
+            return jsonify({
+                "recommendations": [],
+                "message": (
+                    "No providers currently match "
+                    "that service category."
+                )
+            }), 200
+
+        # Retrieve existing scheduled appointments
+        scheduled_appointments = (
+            db.query(Appointment)
+            .filter(
+                Appointment.appointment_date >= now,
+                Appointment.appointment_date <= end_date,
+                Appointment.status == "scheduled"
+            )
+            .all()
+        )
+
+        booked_slots = {
+            (
+                appointment.provider_name,
+                appointment.appointment_date
+            )
+            for appointment in scheduled_appointments
+        }
+
+        candidates = []
+
+        for day_offset in range(1, 91):
+            day = now + timedelta(days=day_offset)
+
+            # Monday through Friday only
+            if day.weekday() >= 5:
+                continue
+
+            for provider in providers:
+
+                for hour, minute in available_times:
+
+                    slot_datetime = day.replace(
+                        hour=hour,
+                        minute=minute,
+                        second=0,
+                        microsecond=0
+                    )
+
+                    slot_key = (
+                        provider.name,
+                        slot_datetime
+                    )
+
+                    if slot_key in booked_slots:
+                        continue
+
+                    score = 0
+                    reasons = []
+
+                    # Provider/service match
+                    score += 2
+
+                    reasons.append(
+                        "Provider matches your "
+                        "selected service."
+                    )
+
+                    # Scheduling preference
+                    if (
+                        time_preference == "morning"
+                        and hour < 12
+                    ):
+                        score += 1
+
+                        reasons.append(
+                            "Matches your morning "
+                            "time preference."
+                        )
+
+                    elif (
+                        time_preference == "afternoon"
+                        and hour >= 12
+                    ):
+                        score += 1
+
+                        reasons.append(
+                            "Matches your afternoon "
+                            "time preference."
+                        )
+
+                    elif time_preference == "any":
+                        reasons.append(
+                            "No specific time preference "
+                            "was selected."
+                        )
+
+                    candidates.append({
+                        "provider_id":
+                            provider.id,
+
+                        "provider_name":
+                            provider.name,
+
+                        "specialty":
+                            provider.specialty,
+
+                        "service_category":
+                            provider.service_category,
+
+                        "appointment_date":
+                            slot_datetime.isoformat(),
+
+                        "score":
+                            score,
+
+                        "reason":
+                            " ".join(reasons)
+                    })
+
+        # Higher score first, then earliest appointment
+        candidates.sort(
+            key=lambda slot: (
+                -slot["score"],
+                slot["appointment_date"]
+            )
+        )
+
+        recommendations = candidates[:3]
+
+        return jsonify({
+            "recommendations": recommendations
+        }), 200
+
+    except Exception as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+    finally:
+        db.close()
+
 
 # Book an appointment (for patients)
 @appointment_bp.route("/appointments/book", methods=["POST"])
@@ -277,63 +470,185 @@ def reschedule_appointment(id):
 @appointment_bp.route("/appointments/<int:id>",methods=["GET"])
 @require_auth
 def get_appointment(id):
-
     db = SessionLocal()
 
-    appointment = (
-        db.query(Appointment)
-        .filter(Appointment.id == id)
-        .first()
-    )
+    try:
+        current_user = (
+            db.query(User)
+            .filter(
+                User.provider_id == g.user_id
+            )
+            .first()
+        )
 
-    if not appointment:
-        db.close()
-        return jsonify({
-            "error": "Appointment not found"
-        }), 404
-    
-    # Data that shows when view details is pressed
-    result = {
-        "id": appointment.id,
-        "patient_notes": appointment.patient_notes,
-        "doctor_notes": appointment.doctor_notes,
-        "reason": appointment.reason,
-        "status": appointment.status,
-        "provider_name": appointment.provider_name,
-        "appointment_date": appointment.appointment_date.isoformat() if appointment.appointment_date else None,
-    }
+        if not current_user:
+            return jsonify({
+                "error": "User not found"
+            }), 404
 
-    db.close()
+        appointment = (
+            db.query(Appointment)
+            .filter(
+                Appointment.id == id
+            )
+            .first()
+        )
 
-    return jsonify(result)
+        if not appointment:
+            return jsonify({
+                "error": "Appointment not found"
+            }), 404
 
-# Doctor can view all appointments for their patients
-@appointment_bp.route("/appointments", methods=["GET"])
-@require_auth
-#@require_role("doctor")
-def get_user_appointments():
-    db = SessionLocal()
-    appointments = db.query(Appointment).all()
-    # Logic to retrieve appointments for the authenticated user
-    allAppointments = [
-        {
+        # Patients can only view their own appointment.
+        if current_user.role == "patient":
+            if appointment.patient_id != g.user_id:
+                return jsonify({
+                    "error": "Access denied"
+                }), 403
+
+        # Doctors can view appointment records.
+        elif current_user.role == "doctor":
+            pass
+
+        # Block any unknown role.
+        else:
+            return jsonify({
+                "error": "Access denied"
+            }), 403
+
+        patient = (
+            db.query(User)
+            .filter(User.provider_id == appointment.patient_id)
+            .first()
+        )
+
+        result = {
             "id": appointment.id,
+            "patient_name": patient.name
+                if patient
+                else "Unknown Patient",
             "patient_id": appointment.patient_id,
-            #"doctor_id": appointment.doctor_id,
-            "appointment_date": appointment.appointment_date,
-            "provider_name": appointment.provider_name,
-            "reason": appointment.reason,
             "patient_notes": appointment.patient_notes,
             "doctor_notes": appointment.doctor_notes,
+            "reason": appointment.reason,
             "status": appointment.status,
-            "pcp_notification_requested": appointment.pcp_notification_requested,
-            "pcp_name": appointment.pcp_name,
-            "pcp_email": appointment.pcp_email,
+            "provider_name": appointment.provider_name,
+
+            "appointment_date":
+                appointment.appointment_date.isoformat()
+                if appointment.appointment_date
+                else None
         }
-        for appointment in appointments
-    ]
-    db.close()
-    return jsonify({"appointments": allAppointments}) 
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+    finally:
+        db.close()
+
+# Doctor can view all appointments for their patients
+# Doctor can view all appointments
+@appointment_bp.route(
+    "/appointments",
+    methods=["GET"]
+)
+@require_auth
+@require_role("doctor")
+def get_user_appointments():
+    db = SessionLocal()
+
+    try:
+        appointments = (
+            db.query(Appointment)
+            .order_by(
+                Appointment.appointment_date.asc()
+            )
+            .all()
+        )
+
+        all_appointments = []
+
+        for appointment in appointments:
+
+            # Appointment.patient_id stores the user's
+            # authentication provider ID.
+            patient = (
+                db.query(User)
+                .filter(User.provider_id == appointment.patient_id)
+                .first()
+            )
+
+            all_appointments.append({
+                "id": appointment.id,
+                "patient_id": appointment.patient_id,
+                "patient_name": patient.name
+                    if patient
+                    else "Unknown Patient",
+                "appointment_date": appointment.appointment_date.isoformat()
+                    if appointment.appointment_date
+                    else None,
+                "provider_name": appointment.provider_name,
+                "reason": appointment.reason,
+                "patient_notes": appointment.patient_notes,
+                "doctor_notes": appointment.doctor_notes,
+                "status": appointment.status, 
+                "pcp_notification_requested": appointment.pcp_notification_requested,
+                "pcp_name": appointment.pcp_name,
+                "pcp_email": appointment.pcp_email
+            })
+
+        return jsonify({
+            "appointments": all_appointments
+        }), 200
+
+    finally:
+        db.close()
+
+# Patient view all appointments
+@appointment_bp.route("/appointments/mine", methods=["GET"])
+@require_auth
+@require_role("patient")
+def get_my_appointments():
+    db = SessionLocal()
+
+    try:
+        appointments = (
+            db.query(Appointment)
+            .filter(Appointment.patient_id == g.user_id)
+            .order_by(Appointment.appointment_date.asc()
+            ).all()
+        )
+
+        result = [
+            {
+                "id": appointment.id,
+                "patient_id": appointment.patient_id,
+                "appointment_date":appointment.appointment_date.isoformat()
+                    if appointment.appointment_date
+                    else None,
+                "provider_name": appointment.provider_name,
+                "reason": appointment.reason,
+                "patient_notes": appointment.patient_notes,
+                "doctor_notes": appointment.doctor_notes,
+                "status": appointment.status,
+                "pcp_notification_requested":appointment.pcp_notification_requested,
+                "pcp_name": appointment.pcp_name,
+                "pcp_email": appointment.pcp_email
+            }
+            for appointment in appointments
+        ]
+
+        return jsonify({
+            "appointments": result
+        }), 200
+
+    finally:
+        db.close()
+
 
 # Update doctor notes for an appointment (for doctors)
 @appointment_bp.route("/appointments/<int:id>/notes",methods=["PUT"])
@@ -363,3 +678,43 @@ def update_doctor_notes(id):
     db.close()
 
     return jsonify({ "message": "Doctor notes updated"}), 200
+
+# Mark an appointment visit as completed (for doctors)
+@appointment_bp.route("/appointments/<int:id>/complete",methods=["PUT"])
+@require_auth
+@require_role("doctor")
+def complete_appointment(id):
+    db = SessionLocal()
+
+    try:
+        appointment = (
+            db.query(Appointment)
+            .filter(
+                Appointment.id == id
+            )
+            .first()
+        )
+
+        if not appointment:
+            return jsonify({
+                "error": "Appointment not found"
+            }), 404
+
+        appointment.status = "completed"
+
+        db.commit()
+
+        return jsonify({
+            "message": "Visit marked as completed",
+            "status": appointment.status
+        }), 200
+
+    except Exception as e:
+        db.rollback()
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+    finally:
+        db.close()

@@ -1,16 +1,16 @@
 import requests
 
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify
 from services.drift_client import ask_drift
 from services.drift_validator import validate_response
 from config import DRIFT_API_KEY
 from models.prompt import Prompt
 from models.database import SessionLocal
+from flask import g
 from User import User
 from middleware.authMiddleware import require_auth
 
 api_bp = Blueprint("api", __name__)
-
 
 @api_bp.route("/ask-ai", methods=["POST"])
 @require_auth
@@ -23,7 +23,9 @@ def ask_ai():
         # Find the authenticated user.
         current_user = (
             session.query(User)
-            .filter(User.provider_id == g.user_id)
+            .filter(
+                User.provider_id == g.user_id
+            )
             .first()
         )
 
@@ -45,16 +47,7 @@ def ask_ai():
                 "error": "Prompt required"
             }), 400
 
-        # Full prompt is sent to the real Drift service.
         prompt = data["prompt"]
-
-        # Raw scheduling request is used only by the development fallback.
-        # Keeping this separate prevents fallback keywords from matching words
-        # that appear in the AI instructions themselves.
-        user_request = data.get(
-            "user_request",
-            ""
-        )
 
         print("calling drift")
 
@@ -84,22 +77,30 @@ def ask_ai():
 
         except requests.exceptions.ConnectionError:
             # DEVELOPMENT FALLBACK:
-            # The provided Drift server is currently unavailable. Classify
-            # only the patient's raw request so the rest of the scheduling
-            # integration can still be developed and tested accurately.
+            # The provided Drift server is currently
+            # refusing connections. This allows the
+            # rest of the scheduling integration to
+            # be developed and tested.
             print(
                 "Drift unavailable. "
                 "Using development fallback."
             )
 
-            request_lower = user_request.lower()
+            # DEVELOPMENT FALLBACK:
+            # The provided Drift server is currently unavailable.
+            # This simple classifier allows the AI-assisted scheduling
+            # workflow to be developed and tested without inventing
+            # appointment availability.
+            prompt_lower = prompt.lower()
+
 
             # ---------------------------------------------------------
-            # Determine service category from the patient's own words.
+            # Determine service category from words in the user's request
             # ---------------------------------------------------------
+
             if any(
-                phrase in request_lower
-                for phrase in [
+                word in prompt_lower
+                for word in [
                     "vaccine",
                     "vaccination",
                     "flu shot",
@@ -110,8 +111,8 @@ def ask_ai():
                 fallback_service = "Vaccination"
 
             elif any(
-                phrase in request_lower
-                for phrase in [
+                word in prompt_lower
+                for word in [
                     "sports",
                     "sport",
                     "knee",
@@ -126,30 +127,29 @@ def ask_ai():
                 fallback_service = "Sports Injury"
 
             elif any(
-                phrase in request_lower
-                for phrase in [
+                word in prompt_lower
+                for word in [
                     "wellness",
                     "checkup",
                     "check up",
                     "physical",
-                    "bruise",
-                    "bleeding",
-                    "blood",
                     "routine"
                 ]
             ):
                 fallback_service = "Wellness Visit"
 
             else:
-                # Use General Visit when the patient's wording does not
-                # clearly identify one of the more specific categories.
+                # Use General Visit when the request does not clearly
+                # match one of the more specific scheduling categories.
                 fallback_service = "General Visit"
 
+
             # ---------------------------------------------------------
-            # Determine time preference from the patient's own words.
+            # Determine preferred time from words in the user's request
             # ---------------------------------------------------------
+
             if any(
-                phrase in request_lower
+                phrase in prompt_lower
                 for phrase in [
                     "morning",
                     "before noon",
@@ -160,7 +160,7 @@ def ask_ai():
                 fallback_time = "morning"
 
             elif any(
-                phrase in request_lower
+                phrase in prompt_lower
                 for phrase in [
                     "afternoon",
                     "after noon",
@@ -171,15 +171,17 @@ def ask_ai():
                 fallback_time = "afternoon"
 
             else:
-                # No time preference was found in the patient's request.
+                # No scheduling preference was detected.
                 fallback_time = "any"
 
-            # Format the development response exactly like the classification
-            # expected from the real AI service.
+
+            # Format the fallback exactly like the response we expect
+            # from the real scheduling assistant.
             ai_response = (
                 f"SERVICE_CATEGORY: {fallback_service}\n"
                 f"TIME_PREFERENCE: {fallback_time}"
             )
+
 
             response = {
                 "development_fallback": True,
@@ -199,7 +201,20 @@ def ask_ai():
                 ai_response
             )
 
-        # Store the prompt and the real/fallback classification.
+            response = {
+                "development_fallback": True,
+                "choices": [
+                    {
+                        "message": {
+                            "content": ai_response
+                        }
+                    }
+                ]
+            }
+
+            development_fallback = True
+
+        # Store the prompt and AI/fallback response.
         prompt_record = Prompt(
             prompt=prompt,
             response=ai_response,
@@ -211,7 +226,8 @@ def ask_ai():
 
         return jsonify({
             "choices": response["choices"],
-            "development_fallback": development_fallback
+            "development_fallback":
+                development_fallback
         }), 200
 
     except Exception as e:
@@ -227,10 +243,9 @@ def ask_ai():
         traceback.print_exc()
 
         return jsonify({
-            "error": (
+            "error":
                 "An error occurred while "
                 "processing your request"
-            )
         }), 500
 
     finally:

@@ -4,17 +4,22 @@ import { apiRequest } from "../services/api";
 
 function DashboardPage() {
   const [error, setError] = useState("");
+  const [role, setRole] = useState("");
 
   useEffect(() => {
     // Verify current session still has authentication token
     apiRequest("/session-info")
       .then((data) => {
         if (!data.access_token) {
-          // Ask the user to authenticate again if session is incomplete.
           setError(
             "Authentication token is missing. Please log in again."
           );
+          return;
         }
+
+        // Save the authenticated user's role so the
+        // dashboard can show the correct tools.
+        setRole(data.role || "");
       })
       .catch(() => {
         // failed session lookup treated as expired or invalid session
@@ -44,48 +49,62 @@ function DashboardPage() {
       </p>
 
       <hr />
+      {role === "doctor" ? (
+        <div>
+          <h2>Doctor Tools</h2>
 
-      <h2>Appointments</h2>
+          <Link to="/doctor">
+            <button type="button">
+              Doctor Dashboard
+            </button>
+          </Link>
+        </div>
+      ) : (
+        <div>
+          <h2>Appointments</h2>
 
-      {/* Provide the primary appointment actions from the dashboard. */}
-      <div
-        style={{
-          display: "flex",
-          gap: "15px",
-          marginTop: "15px"
-        }}
-      >
-        <Link to="/appointments">
-          <button>
-            View My Appointments
-          </button>
-        </Link>
-        
-        <Link to="/profile">
-          <button>
-            My Profile
-          </button>
-        </Link>
+          {/* Patient appointment actions */}
+          <div
+            style={{
+              display: "flex",
+              gap: "15px",
+              marginTop: "15px"
+            }}
+          >
+            <Link to="/appointments">
+              <button type="button">
+                View My Appointments
+              </button>
+            </Link>
 
-        <Link to="/appointments/slots">
-          <button>
-            View Available Slots
-          </button>
-        </Link>
+            <Link to="/appointments/recommend">
+              <button type="button">
+                Find Recommended Appointment
+              </button>
+            </Link>
 
-        <Link to="/appointments/book">
-          <button>
-            Book Appointment
-          </button>
-        </Link>
-      </div>
+            <Link to="/appointments/slots">
+              <button type="button">
+                View Available Slots
+              </button>
+            </Link>
+          </div>
+        </div>
+      )}
 
       <hr style={{ marginTop: "25px" }} />
 
       <h2>Account</h2>
 
-      {/*backend clear session before returning to the login flow */}
+      <Link to="/profile">
+        <button type="button">
+          My Profile
+        </button>
+      </Link>
+
+      {/* Backend clears the session before returning to login */}
       <button
+        type="button"
         onClick={() => {
           window.location.href =
             "http://localhost:5000/logout";
