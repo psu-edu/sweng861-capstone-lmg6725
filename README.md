@@ -210,9 +210,7 @@ Run the suite from `src/server` with the virtual environment active: python -m p
 
 ### Test Result Screenshot
 
-Save the terminal screenshot showing the passing suite as: docs/test-results.png
-
-![pytest results](docs/TestResults.png)
+![pytest results](docs/test-results.png)
 
 The remaining Flask-Limiter message in the latest run is a warning rather than a failed test.
 
