@@ -1,0 +1,47 @@
+                 ┌─────────────────┐
+                 │      User       │
+                 └────────┬────────┘
+                          │
+                ┌─────────┴─────────┐
+                │                   │
+             Patient              Doctor
+                │                   │
+                └─────────┬─────────┘
+                          │
+                          ▼
+                 ┌────────────────┐
+                 │ React / Vite   │
+                 │   Frontend     │
+                 └───────┬────────┘
+                         │
+                       HTTP
+                         │
+                         ▼
+                 ┌────────────────┐
+                 │ Flask Backend  │
+                 └───────┬────────┘
+                         │
+          ┌──────────────┼──────────────┐
+          │              │              │
+          ▼              ▼              ▼
+       SQLite           Okta          Twilio
+       Database         Auth            SMS
+          │
+     ┌────┼──────┐
+     │    │      │
+   Users Providers Appointments
+                   Visit Records
+
+                     Flask
+                       │
+                       ▼
+                    Drift API
+                       │
+                       ▼
+              Scheduling Classification
+                       │
+                       ▼
+             Recommendation Engine
+                       │
+                       ▼
+              Available Appointments
