@@ -270,14 +270,14 @@ Start Flask: python main.py
 ### Frontend
 
 Open a second terminal:
-cd src\client
-npm install
-npm run dev
+- cd src\client
+- npm install
+- npm run dev
 
 
 ## Environment Variables
 
-Create the backend `.env` file required by the project. Never commit actual credentials or tokens.
+Create the backend `.env` file required by the project. 
 
 ### Backend
 OKTA_CLIENT_ID=<Okta client ID>
@@ -342,7 +342,7 @@ Repository documentation:
 5. `docs/doctor-dashboard.png` - Doctor Dashboard.
 6. `docs/doctor-appointments.png` - Doctor appointment list showing patient names and status filter.
 7. `docs/visit-record.png` - Doctor visit record showing patient notes and doctor-note controls. 
-8. `docs/TestResults.png` - Passing pytest output. You already captured this screenshot.
+8. `docs/test_results.png` - Passing pytest output. You already captured this screenshot.
 
 9. `docs/sms-confirmation.png` - Twilio SMS test message. 
 
