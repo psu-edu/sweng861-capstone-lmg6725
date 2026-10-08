@@ -31,6 +31,7 @@ def test_ai_endpoint_missing_key(client):
 )
 def test_ai_development_fallback_classification(
     client,
+    login_patient,
     user_request,
     expected_service,
     expected_time,
@@ -40,12 +41,6 @@ def test_ai_development_fallback_classification(
     The real Drift request is forced to fail with ConnectionError so this test
     does not depend on the external class-provided AI service being online.
     """
-
-    # /ask-ai requires an authenticated session.
-    with client.session_transaction() as session:
-        session["access_token"] = "fake-token"
-        session["user_id"] = "patient-123"
-
     # Force the real Drift call to be unavailable so the fallback runs.
     with patch(
         "routes.apiRoutes.ask_drift",
@@ -70,10 +65,10 @@ def test_ai_development_fallback_classification(
     assert f"TIME_PREFERENCE: {expected_time}" in content
 
 
-def test_get_appointment_includes_provider_and_date(client):
+def test_get_appointment_includes_provider_and_date(client, login_patient):
     db = SessionLocal()
     appointment = Appointment(
-        patient_id="patient-123",
+        patient_id=login_patient["provider_id"],
         appointment_date=datetime(2026, 9, 17, 14, 30),
         provider_name="Dr. Alex",
         reason="Follow-up",
@@ -86,9 +81,6 @@ def test_get_appointment_includes_provider_and_date(client):
     db.refresh(appointment)
     db.close()
 
-    with client.session_transaction() as session:
-        session["access_token"] = "fake-token"
-        session["user_id"] = "patient-123"
 
     response = client.get(f"/appointments/{appointment.id}")
 

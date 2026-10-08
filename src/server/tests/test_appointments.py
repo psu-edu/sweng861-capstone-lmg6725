@@ -4,13 +4,6 @@ from models.database import SessionLocal
 from models.appointment import Appointment
 
 
-def authenticate(client, user_id="patient-123"):
-    """Add the session values used by the application's auth middleware."""
-    with client.session_transaction() as sess:
-        sess["access_token"] = "test-token"
-        sess["user_id"] = user_id
-
-
 def create_test_appointment(
     patient_id="patient-123",
     provider_name="Dr. Smith",
@@ -46,35 +39,45 @@ def test_appointments_require_auth(client):
     assert response.status_code == 401
 
 
-def test_patient_gets_own_appointments(client):
-    """Patients now use /appointments/mine instead of the doctor list."""
-    authenticate(client)
-
-    response = client.get("/appointments/mine")
+def test_patient_gets_own_appointments(
+    client,
+    login_patient
+):
+    response = client.get(
+        "/appointments/mine"
+    )
 
     assert response.status_code == 200
 
-
-def test_patient_cannot_get_doctor_appointment_list(client):
-    """The all-appointments route is reserved for doctors."""
-    authenticate(client)
-
+def test_patient_cannot_get_doctor_appointment_list(
+    client,
+    login_patient
+):
     response = client.get("/appointments")
 
     assert response.status_code == 403
 
 
-def test_get_missing_appointment(client):
-    authenticate(client)
-
-    response = client.get("/appointments/999999")
+def test_get_missing_appointment(
+    client,
+    login_patient
+):
+    response = client.get(
+        "/appointments/999999"
+    )
 
     assert response.status_code == 404
 
 
-def test_get_existing_appointment(client):
-    appointment_id = create_test_appointment()
-    authenticate(client)
+
+def test_get_existing_appointment(
+    client,
+    login_patient
+):
+    appointment_id = create_test_appointment(
+        patient_id=
+            login_patient["provider_id"]
+    )
 
     response = client.get(
         f"/appointments/{appointment_id}"
@@ -82,11 +85,13 @@ def test_get_existing_appointment(client):
 
     assert response.status_code == 200
 
-def test_user_can_access_own_appointment(client):
+def test_user_can_access_own_appointment(
+    client,
+    login_patient
+):
     appointment_id = create_test_appointment(
-        patient_id="patient-123"
+        patient_id=login_patient["provider_id"]
     )
-    authenticate(client, "patient-123")
 
     response = client.get(
         f"/appointments/{appointment_id}"
@@ -95,12 +100,15 @@ def test_user_can_access_own_appointment(client):
     assert response.status_code == 200
 
 
-def test_patient_cannot_access_another_patients_appointment(client):
-    """A patient must receive 403 for another patient's visit record."""
+def test_patient_cannot_access_another_patients_appointment(
+    client,
+    login_patient,
+    second_patient_user
+):
     appointment_id = create_test_appointment(
-        patient_id="different-patient-id"
+        patient_id=
+            second_patient_user["provider_id"]
     )
-    authenticate(client, "patient-123")
 
     response = client.get(
         f"/appointments/{appointment_id}"
@@ -109,8 +117,7 @@ def test_patient_cannot_access_another_patients_appointment(client):
     assert response.status_code == 403
 
 
-def test_past_appointment_is_rejected(client):
-    authenticate(client)
+def test_past_appointment_is_rejected(client, login_patient):
 
     past_date = (
         datetime.now() - timedelta(days=1)
@@ -131,7 +138,7 @@ def test_past_appointment_is_rejected(client):
     assert "past" in response.get_json()["error"].lower()
 
 
-def test_duplicate_provider_time_is_rejected(client):
+def test_duplicate_provider_time_is_rejected(client, login_patient):
     """Two scheduled visits cannot occupy the same provider/date/time slot."""
     future_date = (
         datetime.now() + timedelta(days=7)
@@ -151,8 +158,6 @@ def test_duplicate_provider_time_is_rejected(client):
         status="scheduled",
     )
 
-    authenticate(client)
-
     response = client.post(
         "/appointments/book",
         json={
@@ -165,3 +170,14 @@ def test_duplicate_provider_time_is_rejected(client):
     )
 
     assert response.status_code == 409
+
+def test_doctor_can_get_all_appointments(
+    client,
+    login_doctor
+):
+    response = client.get(
+        "/appointments"
+    )
+
+    assert response.status_code == 200
+
