@@ -83,15 +83,10 @@ The application uses a layered web architecture:
 
 ### Architecture Diagram
 
-Add the rendered architecture diagram to `docs/architecture.png`, then keep the following Markdown line in this README:
 
-```markdown
-![Campus Health Appointment System architecture](docs/architecture.png)
-```
 
 ![Campus Health Appointment System architecture](docs/architecture.png)
 
-If the architecture is currently stored as a `.txt` diagram, keep the text source if useful, but also export or recreate it as a PNG so it is easy to view in GitHub and reuse in the final PowerPoint.
 
 ## Key Implementation Choices
 
@@ -217,8 +212,6 @@ Run the suite from `src/server` with the virtual environment active: python -m p
 
 Save the terminal screenshot showing the passing suite as: docs/test-results.png
 
-
-Then keep this line in the README:
 ![pytest results](docs/TestResults.png)
 
 The remaining Flask-Limiter message in the latest run is a warning rather than a failed test.
@@ -342,7 +335,7 @@ If the external Drift service is unavailable, explain that the page is using the
 
 ## Demo Screenshots
 
-For repository documentation and the final slide deck, capture these screenshots while the application is in a known-good state:
+Repository documentation:
 
 1. `docs/patient-dashboard.png` - Patient dashboard showing the available scheduling paths.
 2. `docs/available-slots.png` - Available Appointment Slots page with provider/month selection and times.
@@ -350,22 +343,10 @@ For repository documentation and the final slide deck, capture these screenshots
 4. `docs/booking.png` - Booking page with the selected provider/date and booking fields.
 5. `docs/doctor-dashboard.png` - Doctor Dashboard.
 6. `docs/doctor-appointments.png` - Doctor appointment list showing patient names and status filter.
-7. `docs/visit-record.png` - Doctor visit record showing patient notes and doctor-note controls. Use test/demo data only and avoid exposing real personal or health information.
+7. `docs/visit-record.png` - Doctor visit record showing patient notes and doctor-note controls. 
 8. `docs/TestResults.png` - Passing pytest output. You already captured this screenshot.
 
-Optional:
-
-9. `docs/sms-confirmation.png` - Twilio SMS test message. Crop or redact personal phone numbers or other personal information before committing the image.
-
-You do not need every screenshot in the final PowerPoint. The README can contain a small selection, while the slide deck should use only the screenshots that support the story of the demo.
-
-## Security Notes
-
-- Keep `.env` out of source control.
-- Do not commit Okta, Drift, or Twilio secrets.
-- Backend role checks enforce protected Doctor and Patient operations.
-- React role-aware pages improve the user experience, but backend authorization remains responsible for protecting API operations.
-- Use test/demo data in committed screenshots and avoid exposing real patient or account information.
+9. `docs/sms-confirmation.png` - Twilio SMS test message. 
 
 ## Known Development Limitations
 
