@@ -253,6 +253,7 @@ Clone the repository:
 git clone https://github.com/psu-edu/sweng861-capstone-lmg6725.git
 cd sweng861-capstone-lmg6725
 
+
 ## How to Run
 
 ### Backend
@@ -290,10 +291,34 @@ TWILIO_ACCOUNT_SID=<Twilio account SID>
 TWILIO_AUTH_TOKEN=<Twilio auth token>
 TWILIO_PHONE_NUMBER=<Twilio sending phone number>
 
-
 ### Frontend
 
 VITE_BACKEND_URL=http://localhost:5000
+
+## Okta setup
+This application uses Okta OpenID Connect (OIDC) for authentication. Users authenticate through Okta, and the application creates or updates local user records after successful login.
+
+1. Create an Okta Application
+2. Create or sign in to an Okta Developer account.
+3. Create a Web Application integration.
+    - Configure the Redirect URI:
+4. Copy the following values into the backend .env file:
+- OKTA_CLIENT_ID=
+- OKTA_CLIENT_SECRET=
+- OKTA_ISSUER=
+
+### Test Accounts
+Create test users within Okta for application testing. The application supports both Doctor and Patient
+
+## Initial Role Configuration
+Authentication is handled by Okta, while application authorization uses Doctor and Patient roles stored within the application database.
+
+After creating or logging in with test accounts, role assignments may need to be updated using the helper scripts located in:
+
+src/server/scripts
+Review and execute the appropriate scripts in this directory to update database records and assign Doctor or Patient roles before testing role-protected functionality.
+
+These scripts are used to support the application's role-based access control implementation and Doctor/Patient workflows.
 
 ## How to Demo
 

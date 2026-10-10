@@ -1,5 +1,7 @@
 """Add phone_number column to the existing users table without deleting data.
 
+Add phone number on site with profile.
+
 Run from src/server with the project's virtual environment active:
     python add_phone_number_column.py
 """
