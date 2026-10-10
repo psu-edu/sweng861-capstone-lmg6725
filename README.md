@@ -320,6 +320,29 @@ Review and execute the appropriate scripts in this directory to update database 
 
 These scripts are used to support the application's role-based access control implementation and Doctor/Patient workflows.
 
+## Twilio Setup
+This application uses Twilio to send appointment confirmation and notification SMS messages to patients.
+
+Create a Twilio Account
+Create or sign in to a Twilio account at: https://www.twilio.com
+
+Complete the account verification process.
+
+Obtain a Twilio phone number capable of sending SMS messages.
+
+### Retrieve Twilio Credentials
+From the Twilio Console, copy the following values:
+
+Account SID
+Auth Token
+Twilio Phone Number
+### Configure Environment Variables
+Add the following values to the backend .env file:
+
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
+
 ## How to Demo
 
 ### Patient Demo
